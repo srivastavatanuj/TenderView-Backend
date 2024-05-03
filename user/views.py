@@ -14,7 +14,7 @@ import datetime
 
 def dateToTimestamp(user):
     date_str = user.get_endDate()
-    time_obj = datetime.time(11, 59, 59)
+    time_obj = datetime.time(23, 59, 59)
     datetime_obj = datetime.datetime.combine(date_str,time_obj)
     return datetime_obj.timestamp()
 
@@ -30,14 +30,17 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         sub=Subscription.objects.filter(user=user)
 
-        token['user_id'] = user.id
-        token['user_lastLogin'] = user.last_login.timestamp()
+        token["userData"]={
+            'user_lastLogin':user.last_login.timestamp(),
+            'isActive':dateToTimestamp(sub[0])>datetime.datetime.now().timestamp() if sub else "",
+        }
+      
  
         token['customData']={ 
             "/tenders": {"states":sub[0].get_states()} if sub.exists() else [],
-            'valid_till' : dateToTimestamp(sub[0]) if sub.exists() else ""      
+              
         }
-        token['iss']="TenderView Api View"
+        token['iss']="TenderView Api"
 
         return token
 
@@ -47,17 +50,19 @@ class MyTokenRefreshSerializer(TokenRefreshSerializer):
     def validate(self, attrs):
 
         refresh = self.token_class(attrs["refresh"])
-        userId=refresh.payload['user_id']
-        refresh.payload['user_lastLogin'] = User.objects.get(id=userId).last_login.timestamp()
-       
+        userId = refresh.payload['user_id']
         user=User.objects.get(id=userId)
         sub=Subscription.objects.filter(user=user)
 
+        refresh.payload["userData"]={
+            'user_lastLogin':user.last_login.timestamp(),
+            'isActive':dateToTimestamp(sub[0])>datetime.datetime.now().timestamp() if sub else "",
+        }
         
 
         refresh.payload['customData']={ 
             "/tenders": {"states":sub[0].get_states()} if sub.exists() else [],
-            'valid_till' : dateToTimestamp(sub[0]) if sub.exists() else ""      
+                 
         }
 
         data = {"access": str(refresh.access_token)}
@@ -99,7 +104,7 @@ class RequestDemo(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user, endDate=timezone.now(
-        ).date()+timezone.timedelta(days=10))
+        ).date()+timezone.timedelta(days=3))
 
 
 class Subscribe(generics.UpdateAPIView):
